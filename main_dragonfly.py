@@ -25,7 +25,7 @@ Fields:
 9 - 'node_count',
 10 - 'tasks_requested'
 """
-
+print("hi")
 
 def xeval(l):
     x = l[:]
