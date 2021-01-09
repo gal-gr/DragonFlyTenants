@@ -59,17 +59,19 @@ def read():
     m = len(SUC)  # non-zero jobs, succesfully ending
     print "m:", m
     print
+    #percent of requests require r hosts
     R_CDF = [(r, len([x for x in SUC if (eval(x[IND_JOB_SIZE]) <= r)]) * 1.0 / m) for r in R]
     TSUC = [[eval(x[IND_JOB_SIZE]), parsedate(x[IND_SUBMIT_TIME]),
              parsedate(x[IND_END_TIME]) - parsedate(x[IND_START_TIME]), -1, -1, 0, 0, [], [], -1] for x in SUC]
 
     print
+    #Time from 1 to 2 ^16
     T = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384, 32768, 65536]
     T_CDF = [(t, len([x for x in TSUC if (x[2] <= t)]) * 1.0 / m) for t in T]
     # for x in T_CDF:
     #    print x
 
-    print "dene read B"
+    print "done read B"
     return TSUC
 
 
@@ -81,15 +83,15 @@ def read():
 4 end_time
 5 done
 """
-I_SIZE = 0
-I_ARRIVAL = 1
-I_LEN = 2
-I_SCHED = 3
-I_END = 4
+I_SIZE = 0 #number of hosts desired
+I_ARRIVAL = 1 #arrival on trace
+I_LEN = 2 # length of request time
+I_SCHED = 3 #time of stating job
+I_END = 4 # future time of ending job
 I_OTHERS = 5
 I_OTHERS_BIG = 6
-I_GROUPS = 7
-I_SPINES = 8
+I_GROUPS = 7 # number of leafs involved in mappings
+I_SPINES = 8 # number of spines per mapping
 I_LATENCY = 9
 
 
@@ -112,8 +114,8 @@ def schedule(TSUC):
 
     n_added = 0
     n_done = 0
-    dc_load = 0
-    current_time = 0
+    dc_load = 0 # num of hosts that are not avaliable
+    current_time = 0 #
 
     i = 0
     while (i < n):
@@ -291,7 +293,7 @@ def spineformapping(mapping, leafs=64):  # a mapping is a vector of size DC_SIZE
 
 
 def finalschedule(TSUC):
-    DC = []
+    DC = [] #active tennants -still running
     Queue = []
     last_served = -1
     DC_SIZE = 2048
@@ -312,19 +314,22 @@ def finalschedule(TSUC):
     dc_load = 0
     current_time = 0
 
-    spines_joint = []
-    spines_inc = []
-    spines_random = []
+    '''
+    DC - all the tennant indexs that are still running and take hosts 
+    DCmap- an array of all tennats that determines which tennat is still running- (1- still running, 0- finished)
+    mapping arrays- all the hosts that are taken or not in the array- a values is a index of a tennat which is holding the host 
+    
+    '''
+
 
     i = 0
     ppp = 0
-    #   while (i < 1000): 
     while (i < n):
         if (i % 1000 == 0):
             print "(", i, ")", current_time
         current_time = max(current_time, T[i][I_ARRIVAL])
-        DC = [j for j in DC if T[j][I_END] > current_time]
-        dc_load = sum([T[j][I_SIZE] for j in DC])
+        DC = [j for j in DC if T[j][I_END] > current_time] #unfinished tennanats
+        dc_load = sum([T[j][I_SIZE] for j in DC]) # hosts which are taken
         DCmap = [0 for j in range(n)]
         for j in DC:
             DCmap[j] = 1
@@ -335,6 +340,8 @@ def finalschedule(TSUC):
                 mapping_inc[j] = -1
             if ((mapping_random[j] != -1) and (DCmap[mapping_random[j]] == 0)):
                 mapping_random[j] = -1
+
+        #run till you can make the demnad of tennant i
 
         while (T[i][I_SIZE] > (DC_SIZE - dc_load)):
             next_end = min([T[j][I_END] for j in DC])
