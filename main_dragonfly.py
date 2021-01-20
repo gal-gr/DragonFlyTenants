@@ -1,4 +1,5 @@
 from string import split
+import group
 import datetime, time
 import os
 import random
@@ -62,7 +63,7 @@ def read():
     #percent of requests require r hosts
     R_CDF = [(r, len([x for x in SUC if (eval(x[IND_JOB_SIZE]) <= r)]) * 1.0 / m) for r in R]
     TSUC = [[eval(x[IND_JOB_SIZE]), parsedate(x[IND_SUBMIT_TIME]),
-             parsedate(x[IND_END_TIME]) - parsedate(x[IND_START_TIME]), -1, -1, 0, 0, [], [], -1] for x in SUC]
+             parsedate(x[IND_END_TIME]) - parsedate(x[IND_START_TIME]), -1, -1, 0, 0, [], [],-1,[]] for x in SUC]
 
     print
     #Time from 1 to 2 ^16
@@ -90,9 +91,10 @@ I_SCHED = 3 #time of stating job
 I_END = 4 # future time of ending job
 I_OTHERS = 5
 I_OTHERS_BIG = 6
-I_GROUPS = 7 # number of leafs involved in mappings
+I_LEAVES = 7 # number of leafs involved in mappings
 I_SPINES = 8 # number of spines per mapping
 I_LATENCY = 9
+I_GROUPS = 10 # number of Groups in mappings
 
 
 # I_DONE = 5
@@ -241,7 +243,7 @@ def reschedule(TSUC):
             grps_inc += found_inc
             grps_random += found_random
 
-        T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
+        T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
         i = i + 1
     return T
 
@@ -292,7 +294,7 @@ def spineformapping(mapping, leafs=64):  # a mapping is a vector of size DC_SIZE
     return len(spines)
 
 
-def finalschedule(TSUC):
+def finalschedule(TSU,radix):
     DC = [] #active tennants -still running
     Queue = []
     last_served = -1
@@ -303,6 +305,9 @@ def finalschedule(TSUC):
     n = len(T)
     print m, n, n * 1.0 / m
 
+
+    # intialize all groups and their mappings
+    mapping_groups = [group(radix) for i in range(DC_SIZE)]
     mapping_joint = [-1 for i in range(DC_SIZE)]
     mapping_inc = [-1 for i in range(DC_SIZE)]
     mapping_random = [-1 for i in range(DC_SIZE)]
@@ -333,6 +338,7 @@ def finalschedule(TSUC):
         DCmap = [0 for j in range(n)]
         for j in DC:
             DCmap[j] = 1
+        for k in range((radix/2)+1)):
         for j in range(DC_SIZE):
             if ((mapping_joint[j] != -1) and (DCmap[mapping_joint[j]] == 0)):
                 mapping_joint[j] = -1
@@ -419,7 +425,7 @@ def finalschedule(TSUC):
             grps_inc += found_inc
             grps_random += found_random
 
-        T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
+        T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
         #        if (i == 3):
         #            print mapping_joint
         T[i][I_SPINES] = [spineformapping(mapping_joint), spineformapping(mapping_inc), spineformapping(mapping_random)]
@@ -546,7 +552,7 @@ def schedule_latency(TSUC, DC_SIZE=2048):
             grps_inc += found_inc
             grps_random += found_random
 
-        T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
+        T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
         T[i][I_SPINES] = [spineformapping(mapping_joint, DC_SIZE / LEAF_SIZE),
                           spineformapping(mapping_inc, DC_SIZE / LEAF_SIZE),
                           spineformapping(mapping_random, DC_SIZE / LEAF_SIZE)]
@@ -664,7 +670,7 @@ def main():
     leaves_vals = [2 ** i for i in range(0, 7)]
     spine_vals = [1, 2, 4, 8, 16, 24, 32, 48]
 
-    leaves = [[len([i for i in range(len(T)) if T[i][I_GROUPS][j] <= bound]) for bound in leaves_vals] for j in
+    leaves = [[len([i for i in range(len(T)) if T[i][I_LEAVES][j] <= bound]) for bound in leaves_vals] for j in
               range(3)]
     spines = [[len([i for i in range(len(T)) if T[i][I_SPINES][j] <= bound]) for bound in spine_vals] for j in range(3)]
 
@@ -674,7 +680,7 @@ def main():
             print "(", leaves_vals[i], ",", leaves[j][i] * 1.0 / len(T), ")"
         print
     print
-    print "$", [sum([T[i][I_GROUPS][j] for i in range(len(T))]) * 1.0 / len(T) for j in range(3)]
+    print "$", [sum([T[i][I_LEAVES][j] for i in range(len(T))]) * 1.0 / len(T) for j in range(3)]
 
     print "spines"
     for j in range(3):
