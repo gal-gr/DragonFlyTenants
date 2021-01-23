@@ -94,158 +94,6 @@ I_GROUPS = 7  # number of leafs involved in mappings
 I_SPINES = 8  # number of spines per mapping
 I_LATENCY = 9
 
-
-# I_DONE = 5
-
-def setmapping():
-    return
-
-
-def schedule(TSUC):
-    DC = []
-    Queue = []
-    last_served = -1
-    DC_SIZE = 2048
-    FUTURE_TIME = 2000000000
-    m = len(TSUC)
-    T = [x for x in TSUC if x[0] <= DC_SIZE]
-    n = len(T)
-    print m, n, n * 1.0 / m
-
-    n_added = 0
-    n_done = 0
-    dc_load = 0  # num of hosts that are not avaliable
-    current_time = 0  #
-
-    i = 0
-    while (i < n):
-        if (i % 1000 == 0):
-            print "(", i, ")", current_time
-        current_time = max(current_time, T[i][I_ARRIVAL])
-
-        while (T[i][I_SIZE] > (DC_SIZE - dc_load)):
-            next_end = min([T[j][I_END] for j in DC])
-            current_time = next_end
-            DC = [j for j in DC if T[j][I_END] > current_time]
-            dc_load = sum([T[j][I_SIZE] for j in DC])
-
-        T[i][I_SCHED] = current_time
-        T[i][I_END] = current_time + T[i][I_LEN]
-        DC.append(i)
-        T[i][I_OTHERS] = len(DC)
-        T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
-        dc_load = sum([T[j][I_SIZE] for j in DC])
-        i = i + 1
-
-    return T
-
-
-def reschedule(TSUC):
-    DC = []
-    Queue = []
-    last_served = -1
-    DC_SIZE = 2048
-    FUTURE_TIME = 2000000000
-    m = len(TSUC)
-    T = [x for x in TSUC if x[0] <= DC_SIZE]
-    n = len(T)
-    print m, n, n * 1.0 / m
-
-    mapping_joint = [-1 for i in range(DC_SIZE)]
-    mapping_inc = [-1 for i in range(DC_SIZE)]
-    mapping_random = [-1 for i in range(DC_SIZE)]
-
-    DCmap = [0 for i in range(n)]
-
-    n_added = 0
-    n_done = 0
-    dc_load = 0
-    current_time = 0
-
-    i = 0
-    while (i < n):
-        if (i % 1000 == 0):
-            print "(", i, ")", current_time
-        current_time = max(current_time, T[i][I_ARRIVAL])
-
-        while (T[i][I_SIZE] > (DC_SIZE - dc_load)):
-            next_end = min([T[j][I_END] for j in DC])
-            current_time = next_end
-            DC = [j for j in DC if T[j][I_END] > current_time]
-            dc_load = sum([T[j][I_SIZE] for j in DC])
-
-            DCmap = [0 for J in range(n)]
-            for j in DC:
-                DCmap[j] = 1
-
-            for j in range(DC_SIZE):  # clear those jobs that just finished
-                if ((mapping_joint[j] != -1) and (DCmap[mapping_joint[j]] == 0)):
-                    mapping_joint[j] = -1
-                if ((mapping_inc[j] != -1) and (DCmap[mapping_inc[j]] == 0)):
-                    mapping_inc[j] = -1
-                if ((mapping_random[j] != -1) and (DCmap[mapping_random[j]] == 0)):
-                    mapping_random[j] = -1
-
-        T[i][I_SCHED] = current_time
-        T[i][I_END] = current_time + T[i][I_LEN]
-
-        DC.append(i)
-        T[i][I_OTHERS] = len(DC)
-        T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
-        dc_load = sum([T[j][I_SIZE] for j in DC])
-
-        # DC.sort()
-        # compute the joint mapping by sequential location
-        mapping_joint = [-1 for j in range(DC_SIZE)]
-        last = 0
-        for x in DC:
-            for j in range(T[x][I_SIZE]):
-                mapping_joint[last + j] = x
-            last = last + T[x][I_SIZE]
-
-        sets = 0
-        j = 0
-        # compute the incremental mapping by taking the first empty hosts
-        while ((sets < T[i][I_SIZE]) and (j < DC_SIZE)):
-            if (mapping_inc[j] == -1):
-                mapping_inc[j] = i
-                sets = sets + 1
-            j = j + 1
-
-        sets = 0
-        # compute the random mapping by finding arbitrary empty slots
-        j = random.randint(0, DC_SIZE - 1)
-        while (sets < T[i][I_SIZE]):
-            if (mapping_random[j] == -1):
-                mapping_random[j] = i
-                sets = sets + 1
-                j = random.randint(0, DC_SIZE - 1)
-            j = (j + 1) % DC_SIZE
-
-        grps_joint = 0
-        grps_inc = 0
-        grps_random = 0
-        # find in how many groups (amog the 64 groups, each of 32 hosts) the current tenant appear
-        for j in range(64):
-            found_joint = 0
-            found_inc = 0
-            found_random = 0
-            for k in range(32):
-                if (mapping_joint[j * 32 + k] == i):
-                    found_joint = 1
-                if (mapping_inc[j * 32 + k] == i):
-                    found_inc = 1
-                if (mapping_random[j * 32 + k] == i):
-                    found_random = 1
-            grps_joint += found_joint
-            grps_inc += found_inc
-            grps_random += found_random
-
-        T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
-        i = i + 1
-    return T
-
-
 def spineformapping(mapping, leafs=64):  # a mapping is a vector of size DC_SIZE
     leaf_size = 32
     tenantsD = {}
@@ -294,10 +142,7 @@ def spineformapping(mapping, leafs=64):  # a mapping is a vector of size DC_SIZE
 
 def finalschedule(TSUC):
     DC = []  # active tennants -still running
-    Queue = []
-    last_served = -1
     DC_SIZE = 2048
-    FUTURE_TIME = 2000000000
     m = len(TSUC)
     T = [x for x in TSUC if x[0] <= DC_SIZE]
     n = len(T)
@@ -306,12 +151,6 @@ def finalschedule(TSUC):
     mapping_joint = [-1 for i in range(DC_SIZE)]
     mapping_inc = [-1 for i in range(DC_SIZE)]
     mapping_random = [-1 for i in range(DC_SIZE)]
-
-    DCmap = [0 for i in range(n)]
-
-    n_added = 0
-    n_done = 0
-    dc_load = 0
     current_time = 0
 
     '''
@@ -364,12 +203,6 @@ def finalschedule(TSUC):
         T[i][I_SCHED] = current_time
         T[i][I_END] = current_time + T[i][I_LEN]
 
-        # print "i:", i, T[i][I_ARRIVAL], T[i][I_SCHED],
-        # if (T[i][I_SCHED] < T[i][I_ARRIVAL]):
-        #    print " !"
-        # else:
-        #    print
-
         DC.append(i)
         T[i][I_OTHERS] = len(DC)
         T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
@@ -419,136 +252,7 @@ def finalschedule(TSUC):
             grps_random += found_random
 
         T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
-        #        if (i == 3):
-        #            print mapping_joint
         T[i][I_SPINES] = [spineformapping(mapping_joint), spineformapping(mapping_inc), spineformapping(mapping_random)]
-        if (spineformapping(mapping_joint) > 2) and (ppp == 0):
-            print "@", mapping_joint
-            ppp = 1
-        i = i + 1
-    return T
-
-
-def schedule_latency(TSUC, DC_SIZE=2048):
-    DC = []
-    Queue = []
-    last_served = -1
-    FUTURE_TIME = 2000000000
-    DC_SIZE_BOUND = 2048
-    m = len(TSUC)
-    T = [x for x in TSUC if x[0] <= DC_SIZE_BOUND]
-    n = len(T)
-    print m, n, n * 1.0 / m
-
-    mapping_joint = [-1 for i in range(DC_SIZE)]
-    mapping_inc = [-1 for i in range(DC_SIZE)]
-    mapping_random = [-1 for i in range(DC_SIZE)]
-
-    DCmap = [0 for i in range(n)]
-
-    n_added = 0
-    n_done = 0
-    dc_load = 0
-    current_time = 0
-
-    spines_joint = []
-    spines_inc = []
-    spines_random = []
-
-    i = 0
-    ppp = 0
-    #   while (i < 1000):
-    while (i < n):
-        if (i % 1000 == 0):
-            print "(", i, ")", current_time
-        current_time = max(current_time, T[i][I_ARRIVAL])
-        DC = [j for j in DC if T[j][I_END] > current_time]
-        dc_load = sum([T[j][I_SIZE] for j in DC])
-        DCmap = [0 for j in range(n)]
-        for j in DC:
-            DCmap[j] = 1
-        for j in range(DC_SIZE):
-            if ((mapping_joint[j] != -1) and (DCmap[mapping_joint[j]] == 0)):
-                mapping_joint[j] = -1
-            if ((mapping_inc[j] != -1) and (DCmap[mapping_inc[j]] == 0)):
-                mapping_inc[j] = -1
-            if ((mapping_random[j] != -1) and (DCmap[mapping_random[j]] == 0)):
-                mapping_random[j] = -1
-
-        while (T[i][I_SIZE] > (DC_SIZE - dc_load)):
-            next_end = min([T[j][I_END] for j in DC])
-            if (next_end < current_time):
-                print "please check"
-            current_time = next_end
-            DC = [j for j in DC if T[j][I_END] > current_time]
-            dc_load = sum([T[j][I_SIZE] for j in DC])
-
-            DCmap = [0 for j in range(n)]
-            for j in DC:
-                DCmap[j] = 1
-            for j in range(DC_SIZE):
-                if ((mapping_joint[j] != -1) and (DCmap[mapping_joint[j]] == 0)):
-                    mapping_joint[j] = -1
-                if ((mapping_inc[j] != -1) and (DCmap[mapping_inc[j]] == 0)):
-                    mapping_inc[j] = -1
-                if ((mapping_random[j] != -1) and (DCmap[mapping_random[j]] == 0)):
-                    mapping_random[j] = -1
-
-        T[i][I_SCHED] = current_time
-        T[i][I_END] = current_time + T[i][I_LEN]
-
-        DC.append(i)
-        T[i][I_OTHERS] = len(DC)
-        T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
-        dc_load = sum([T[j][I_SIZE] for j in DC])
-
-        mapping_joint = [-1 for j in range(DC_SIZE)]
-        last = 0
-        for x in DC:
-            for j in range(T[x][I_SIZE]):
-                mapping_joint[last + j] = x
-            last = last + T[x][I_SIZE]
-
-        sets = 0
-        j = 0
-        while ((sets < T[i][I_SIZE]) and (j < DC_SIZE)):
-            if (mapping_inc[j] == -1):
-                mapping_inc[j] = i
-                sets = sets + 1
-            j = j + 1
-
-        sets = 0
-        j = random.randint(0, DC_SIZE - 1)
-        while (sets < T[i][I_SIZE]):
-            if (mapping_random[j] == -1):
-                mapping_random[j] = i
-                sets = sets + 1
-                j = random.randint(0, DC_SIZE - 1)
-            j = (j + 1) % DC_SIZE
-
-        grps_joint = 0
-        grps_inc = 0
-        grps_random = 0
-        LEAF_SIZE = 32
-        for j in range(DC_SIZE / LEAF_SIZE):
-            found_joint = 0
-            found_inc = 0
-            found_random = 0
-            for k in range(32):
-                if (mapping_joint[j * 32 + k] == i):
-                    found_joint = 1
-                if (mapping_inc[j * 32 + k] == i):
-                    found_inc = 1
-                if (mapping_random[j * 32 + k] == i):
-                    found_random = 1
-            grps_joint += found_joint
-            grps_inc += found_inc
-            grps_random += found_random
-
-        T[i][I_GROUPS] = [grps_joint, grps_inc, grps_random]
-        T[i][I_SPINES] = [spineformapping(mapping_joint, DC_SIZE / LEAF_SIZE),
-                          spineformapping(mapping_inc, DC_SIZE / LEAF_SIZE),
-                          spineformapping(mapping_random, DC_SIZE / LEAF_SIZE)]
         if (spineformapping(mapping_joint) > 2) and (ppp == 0):
             print "@", mapping_joint
             ppp = 1
@@ -558,9 +262,6 @@ def schedule_latency(TSUC, DC_SIZE=2048):
 
 def schedule_latency_short(TSUC, DC_SIZE=2048):
     DC = []
-    Queue = []
-    last_served = -1
-    FUTURE_TIME = 2000000000
     DC_SIZE_BOUND = 2048
     m = len(TSUC)
     T = [x for x in TSUC if x[0] <= DC_SIZE_BOUND]
@@ -570,21 +271,10 @@ def schedule_latency_short(TSUC, DC_SIZE=2048):
     mapping_joint = [-1 for i in range(DC_SIZE)]
     mapping_inc = [-1 for i in range(DC_SIZE)]
     mapping_random = [-1 for i in range(DC_SIZE)]
-
-    DCmap = [0 for i in range(n)]
-
-    n_added = 0
-    n_done = 0
-    dc_load = 0
     current_time = 0
 
-    spines_joint = []
-    spines_inc = []
-    spines_random = []
-
     i = 0
-    ppp = 0
-    #    while (i < 3000):
+
     while (i < n):
         if (i % 1000 == 0):
             print "(", i, ")", current_time
