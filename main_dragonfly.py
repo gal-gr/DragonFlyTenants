@@ -10,6 +10,8 @@ import random
 # os.chdir("DisjointTreesACM/Data/Trinity")
 fname = 'Trinity.csv'
 
+HOPS = 2
+
 IND_START_TIME = 3
 IND_END_TIME = 6
 IND_STATUS = 8
@@ -103,58 +105,10 @@ I_GROUPS = 10 # number of Groups in mappings
 # I_DONE = 5
 
 
-def spineformapping(mapping, leafs=64):  # a mapping is a vector of size DC_SIZE
-    leaf_size = 32
-    tenantsD = {}
-    for x in mapping:
-        if x != -1:
-            tenantsD[x] = [0 for j in range(leafs)]
-
-    # computing the groups for each existing tenant
-    tenantsIDs = tenantsD.keys()
-    for j in range(leafs):
-        for k in range(32):
-            x = mapping[j * 32 + k]
-            if (x != -1):
-                tenantsD[x][j] = 1
-
-    for x in tenantsIDs:
-        if (sum(tenantsD[x]) == 1):
-            tenantsD.pop(x)
-    tenantsIDs = tenantsD.keys()
-    tenantsIDs.sort()
-    spines = []
-    #    print tenantsIDs
-    for ten in tenantsIDs:
-        tenant = tenantsD[ten]
-        n_spines = len(spines)
-        found = 0
-        s = 0
-        while ((found == 0) and (s < n_spines)):
-            legal = 1
-            for j in range(leafs):
-                if ((tenant[j] == 1) and (spines[s][j] == 1)):
-                    legal = 0
-            if (legal):
-                found = 1
-                for j in range(leafs):
-                    if (tenant[j]):
-                        spines[s][j] = 1
-            else:
-                s = s + 1
-        if found == 0:
-            newspine = tenant[:]
-            spines.append(newspine)
-
-    return len(spines)
-
 
 def finalschedule(TSUC,radix):
     DC = [] #active tennants -still running
-    Queue = []
-    last_served = -1
-    DC_SIZE = 2048
-    FUTURE_TIME = 2000000000
+    DC_SIZE = (radix*radix/4) * (HOPS+1)   # Tentative- num of hosts of 3 Groups for now
     m = len(TSUC)
     T = [x for x in TSUC if x[0] <= DC_SIZE]
     n = len(T)
@@ -164,9 +118,6 @@ def finalschedule(TSUC,radix):
 
     # intialize all groups and their mappings
     mapping_groups = [group(radix) for i in range((radix/2) +1)]
-    mapping_joint = [-1 for i in range(DC_SIZE)]
-    mapping_inc = [-1 for i in range(DC_SIZE)]
-    mapping_random = [-1 for i in range(DC_SIZE)]
     current_time = 0
 
     '''
@@ -178,7 +129,7 @@ def finalschedule(TSUC,radix):
 
 
     i = 0
-    ppp = 0
+
     while (i < n):
         if (i % 1000 == 0):
             print "(", i, ")", current_time
@@ -235,15 +186,39 @@ def finalschedule(TSUC,radix):
         DC.append(i)
         T[i][I_OTHERS] = len(DC)
         T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
-        dc_load = sum([T[j][I_SIZE] for j in DC])
+
 
 
         ######################### our mapping ############################################
-        newList=sorted(mapping_groups, key=lambda x: x.avaliableHosts, reverse=False)
-        if T[i][I_SIZE] <=  radix/4 :
+        #TODO: change to dictionary !!!
+        avaliableHosts = [x.avaliableHosts for x in mapping_groups]
+        sortedIndexes = [h[0] for h in sorted(enumerate(avaliableHosts), key=lambda x:x[1])]
+        success = False
+        # small tennants
+        if T[i][I_SIZE] <=  radix*radix/4 :
             for j in range((radix/2)+1):
-                if newList[j].avaliableHosts >= T[i][I_SIZE] :
-                    pass
+                if mapping_groups[sortedIndexes[j]].avaliableHosts >= T[i][I_SIZE] :
+                    if mapping_groups[sortedIndexes[j]].is_Single_Spine_Placed(T[i][I_SIZE],i):
+                        success = True
+                        break
+
+        if T[i][I_SIZE] <= mapping_groups[sortedIndexes[-1]].avaliableHosts + mapping_groups[sortedIndexes[-2]].avaliableHosts + mapping_groups[sortedIndexes[-3]].avaliableHosts :
+            if success == False:
+                forbiddenArray = [0 for i in range(radix/2)]
+                j = radix/2 -1
+
+        '''
+        for each group starting from best avaliability groups to the lowest :
+             for each spine of the group fill group with hosts as many as you can
+                for each other group starting from best avalability connect long link if you can and fill group from
+                 that spine 
+                    from each remaining group starting from best avalability connect long link if you can and fill group from
+                    that spine
+                    and all other combinations..
+                    mark 1 in forbbiden array (more to think about it)  
+        
+        
+        '''
 
 
 
@@ -251,58 +226,22 @@ def finalschedule(TSUC,radix):
 
 
 
-        ##################################################################################
 
-        # DC.sort()
-        mapping_joint = [-1 for j in range(DC_SIZE)]
-        last = 0
-        for x in DC:
-            for j in range(T[x][I_SIZE]):
-                mapping_joint[last + j] = x
-            last = last + T[x][I_SIZE]
 
-        sets = 0
-        j = 0
-        while ((sets < T[i][I_SIZE]) and (j < DC_SIZE)):
-            if (mapping_inc[j] == -1):
-                mapping_inc[j] = i
-                sets = sets + 1
-            j = j + 1
 
-        sets = 0
-        j = random.randint(0, DC_SIZE - 1)
-        while (sets < T[i][I_SIZE]):
-            if (mapping_random[j] == -1):
-                mapping_random[j] = i
-                sets = sets + 1
-                j = random.randint(0, DC_SIZE - 1)
-            j = (j + 1) % DC_SIZE
 
-        grps_joint = 0
-        grps_inc = 0
-        grps_random = 0
-        for j in range(64):
-            found_joint = 0
-            found_inc = 0
-            found_random = 0
-            for k in range(32):
-                if (mapping_joint[j * 32 + k] == i):
-                    found_joint = 1
-                if (mapping_inc[j * 32 + k] == i):
-                    found_inc = 1
-                if (mapping_random[j * 32 + k] == i):
-                    found_random = 1
-            grps_joint += found_joint
-            grps_inc += found_inc
-            grps_random += found_random
 
-        T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
-        #        if (i == 3):
-        #            print mapping_joint
-        T[i][I_SPINES] = [spineformapping(mapping_joint), spineformapping(mapping_inc), spineformapping(mapping_random)]
-        if (spineformapping(mapping_joint) > 2) and (ppp == 0):
-            print "@", mapping_joint
-            ppp = 1
+
+            ##################################################################################
+
+
+
+
+        #T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
+
+        #T[i][I_SPINES] = [spineformapping(mapping_joint), spineformapping(mapping_inc), spineformapping(mapping_random)]
+
+
         i = i + 1
     return T
 
@@ -422,7 +361,7 @@ def schedule_latency(TSUC, DC_SIZE=2048):
             grps_joint += found_joint
             grps_inc += found_inc
             grps_random += found_random
-
+        '''
         T[i][I_LEAVES] = [grps_joint, grps_inc, grps_random]
         T[i][I_SPINES] = [spineformapping(mapping_joint, DC_SIZE / LEAF_SIZE),
                           spineformapping(mapping_inc, DC_SIZE / LEAF_SIZE),
@@ -430,6 +369,7 @@ def schedule_latency(TSUC, DC_SIZE=2048):
         if (spineformapping(mapping_joint) > 2) and (ppp == 0):
             print "@", mapping_joint
             ppp = 1
+        '''
         i = i + 1
     return T
 
