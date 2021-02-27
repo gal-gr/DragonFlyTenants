@@ -27,9 +27,19 @@ class group:
 
         return False
 
+    def get_num_Avaliable_hosts_Per_Spine(self,spine):
+
+        leavesCounters = self.getLeavesHosts()
+        spine_array = self.shortLinks[spine]
+        counter = 0
+        for i in range(self.radix / 2):
+            if spine_array[i] == -1:
+                counter += leavesCounters[i]
+        return counter
 
 
 
+    # maybe an error- too many +=1 on leaves found
     def getLeavesHosts(self):
         leavesCounters =[ 0 for i in range((self.radix)/2) ]
         for i in range((self.radix*self.radix)/4) :
