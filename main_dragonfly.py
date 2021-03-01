@@ -104,6 +104,58 @@ I_GROUPS = 10 # number of Groups in mappings
 
 # I_DONE = 5
 
+def checkGroupsAvaliability(mapping_groups,num_of_hosts,radix,indexes_array):
+    for d in range((radix / 2)):
+        sum_connectivity = 0
+        for i, j in zip(range(0, len(indexes_array)), range(0,len(indexes_array))):
+            if (i < j):
+                if mapping_groups[indexes_array[i]].longLinks[d][indexes_array[j]] == -1:
+                    sum_connectivity += 1
+        if sum_connectivity < len(indexes_array) -1 :
+            continue
+        sum = 0
+        for i in range(len(indexes_array)):
+            sum += mapping_groups[indexes_array[i]].get_num_Avaliable_hosts_Per_Spine(d)
+        if (sum >= num_of_hosts):
+            return d
+    return -1
+
+
+def fillGroupsWithHosts(mapping_groups,num_of_hosts,radix,indexes_array,tennant_id,spine_num):
+    #daniel is responsible
+    mapping_groups_aux = [mapping_groups[x] for x in indexes_array ]
+    avaliableHosts = [(group.avaliableHosts,index) for (group,index) in zip(mapping_groups_aux,indexes_array) ]
+    sortedIndexes = [h[1] for h in sorted(avaliableHosts, key=lambda x: x[0])]
+
+    spine num..
+    for i in range....
+
+
+
+
+
+                if Group_1 < Group_2:
+                    mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
+                        mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, Group_1)
+                    mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
+
+                    mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
+                        mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i, T[i][I_SIZE] - Group_1)
+                    mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
+
+                else:
+                    mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
+                        mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i, Group_2)
+                    mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
+
+                    mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
+                        mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, T[i][I_SIZE] - Group_2)
+                    mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
+
+                success = True
+                break
+
+
 
 
 def finalschedule(TSUC,radix):
@@ -131,6 +183,7 @@ def finalschedule(TSUC,radix):
     i = 0
 
     while (i < n):
+        success = False
         if (i % 1000 == 0):
             print "(", i, ")", current_time
         current_time = max(current_time, T[i][I_ARRIVAL])
@@ -152,9 +205,11 @@ def finalschedule(TSUC,radix):
                     mapping_groups[l].longLinks[j][k] = -1
 
 
-        #run till you can make the demnad of tennant i
+    connected = True
+    while success == False:
 
-        while (T[i][I_SIZE] > (DC_SIZE - dc_load)):
+        while ((T[i][I_SIZE] > (DC_SIZE - dc_load)) or not connected):
+            connected = True
             next_end = min([T[j][I_END] for j in DC])
             if (next_end < current_time):
                 print "please check"
@@ -179,15 +234,16 @@ def finalschedule(TSUC,radix):
 
 
 
-        T[i][I_OTHERS] = len(DC)
-        T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])
+        '''T[i][I_OTHERS] = len(DC)
+        T[i][I_OTHERS_BIG] = len([x for x in DC if T[x][I_SIZE] > 1])'''
 
 
         ############### check for small###################################################
         ######################### our mapping ############################################
+
         avaliableHosts = [x.avaliableHosts for x in mapping_groups]
         sortedIndexes = [h[0] for h in sorted(enumerate(avaliableHosts), key=lambda x:x[1])]
-        success = False
+
         # small tennants
         if T[i][I_SIZE] <=  radix*radix/4 :
             for j in range((radix/2)+1):
@@ -212,7 +268,7 @@ def finalschedule(TSUC,radix):
                             success = True
                             break
 
-            ######################### Two Grous ##########################################
+            ######################### Two Groups ##########################################
 
             ## check that both groups never appered together - forbiden sets
             ## check two spines in a for loop every time and if long link avaliable - if there hosts is greater than
@@ -225,34 +281,31 @@ def finalschedule(TSUC,radix):
                 k = radix / 2 - 1
                 for j in range((radix / 2)):
                     for l in range((radix / 2)):
-                        if j != l and set(j,l) not in forbidden:
+                        if j != l and frozenset([j,l]) not in forbidden:
                             if mapping_groups[sortedIndexes[k - j]].avaliableHosts + \
                                   mapping_groups[sortedIndexes[k - l]].avaliableHosts >= T[i][I_SIZE]:
-                                for d in range((radix / 2)):
-                                    if mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] == -1:
-                                        Group_1 = mapping_groups[sortedIndexes[k - j]].get_num_Avaliable_hosts_Per_Spine(d)
-                                        Group_2 = mapping_groups[sortedIndexes[k - l]].get_num_Avaliable_hosts_Per_Spine(d)
-                                        if Group_1 + Group_2 >= T[i][I_SIZE]:
-                                            if Group_1 < Group_2 :
-                                                mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
-                                                    mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, Group_1)
-                                                mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
+                                chosen_spine = checkGroupsAvaliability(mapping_groups, T[i][I_SIZE], radix, [sortedIndexes[k - j],sortedIndexes[k - l]])
+                                if chosen_spine != -1  :
+                                    if Group_1 < Group_2 :
+                                        mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
+                                            mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, Group_1)
+                                        mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
 
-                                                mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
-                                                    mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i, T[i][I_SIZE]-Group_1)
-                                                mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
+                                        mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
+                                            mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i, T[i][I_SIZE]-Group_1)
+                                        mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
 
-                                            else:
-                                                mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
-                                                    mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i,Group_2)
-                                                mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
+                                    else:
+                                        mapping_groups[sortedIndexes[k - l]].shortLinks[d] = \
+                                            mapping_groups[sortedIndexes[k - l]].fillSpineWithHosts(d, i,Group_2)
+                                        mapping_groups[sortedIndexes[k - l]].longLinks[d][sortedIndexes[k - j]] = i
 
-                                                mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
-                                                    mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, T[i][I_SIZE] - Group_2)
-                                                mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
+                                        mapping_groups[sortedIndexes[k - j]].shortLinks[d] = \
+                                            mapping_groups[sortedIndexes[k - j]].fillSpineWithHosts(d, i, T[i][I_SIZE] - Group_2)
+                                        mapping_groups[sortedIndexes[k - j]].longLinks[d][sortedIndexes[k - l]] = i
 
-                                            success = True
-                                            break
+                                    success = True
+                                    break
 
                             if success == True:
                                 break
@@ -280,17 +333,7 @@ def finalschedule(TSUC,radix):
 
 
 
-
-
-            ######################## while true - untill tennat i is done ##################
-
-
-
-
-
-
-
-
+            connected= False
 
 
 
@@ -299,18 +342,6 @@ def finalschedule(TSUC,radix):
         T[i][I_END] = current_time + T[i][I_LEN]
         DC.append(i)
 
-        '''
-        for each group starting from best avaliability groups to the lowest :
-             for each spine of the group fill group with hosts as many as you can
-                for each other group starting from best avalability connect long link if you can and fill group from
-                 that spine 
-                    from each remaining group starting from best avalability connect long link if you can and fill group from
-                    that spine
-                    and all other combinations..
-                    mark 1 in forbbiden array (more to think about it)  
-        
-        
-        '''
 
 
 
@@ -324,7 +355,8 @@ def finalschedule(TSUC,radix):
 
 
 
-            ##################################################################################
+
+
 
 
 
