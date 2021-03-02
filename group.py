@@ -78,8 +78,28 @@ class group:
                             return spine
 
 
+
         if fillCounter != hostsNum:
             print("hosts filling error")
+
+    def fillSpineidWithHosts(self, spine_id, tennantId, hostsNum):
+        fillCounter = 0
+        for i in range(self.radix / 2):
+            if self.shortLinks[spine_id][i] == -1:
+                for j in range(self.radix / 2):
+                    if self.hosts[(i * self.radix / 2) + j] == -1:
+                        self.hosts[(i * self.radix / 2) + j] = tennantId
+                        self.avaliableHosts -= 1
+                        self.shortLinks[spine_id][i] = tennantId
+                        fillCounter += 1
+                        if fillCounter == hostsNum:
+                           return True
+
+        if fillCounter != hostsNum:
+            print("hosts filling error")
+            return False
+
+
 
 
     def getNumOfLeavesInGroup(self,tennantId):
